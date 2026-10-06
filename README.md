@@ -1,23 +1,8 @@
 # KalmanNet: Data-Driven Kalman Filtering
 
-This project implements **KalmanNet**, a hybrid model-based and data-driven Kalman filtering approach proposed in the research paper **"KalmanNet: Data-Driven Kalman Filtering"** by Guy Revach, Nir Shlezinger, Ruud J. G. van Sloun, and Yonina C. Eldar.
+This project implements the **KalmanNet** approach presented in the research paper **"KalmanNet: Data-Driven Kalman Filtering"** by Guy Revach, Nir Shlezinger, Ruud J. G. van Sloun, and Yonina C. Eldar.
 
-The implementation adapts the KalmanNet concept to a **real UAV trajectory dataset from the EuRoC MAV Dataset** and compares its state-estimation performance with a classical Kalman Filter.
-
-## 📌 Project Overview
-
-The classical Kalman Filter is an optimal state-estimation algorithm for linear Gaussian state-space models. However, its performance depends on having accurate knowledge of the underlying system and noise statistics.
-
-KalmanNet addresses this limitation by combining:
-
-* Classical Kalman Filter structure
-* A compact neural network
-* GRU-based temporal memory
-* Data-driven Kalman gain estimation
-
-Instead of directly learning the complete state-estimation task, KalmanNet learns the **Kalman gain** and incorporates the learned gain into the traditional Kalman filtering process.
-
-The original paper describes this as a hybrid data-driven/model-based filter that can improve robustness when the system model is inaccurate.
+KalmanNet combines the structure of a classical Kalman Filter with a compact recurrent neural network to learn the **Kalman Gain** from data. Instead of explicitly requiring the noise covariance matrices, the neural network learns the required filtering behavior from labeled state and observation sequences.
 
 ## 📄 Research Paper
 
@@ -30,258 +15,215 @@ The original paper describes this as a hybrid data-driven/model-based filter tha
 * Ruud J. G. van Sloun
 * Yonina C. Eldar
 
-**Conference:** ICASSP 2021
+**Conference:** IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP), 2021
 
-The implementation in this repository is an educational adaptation of the method described in the paper.
+## 🎯 Project Objective
 
-## 🎯 Objectives
+The objective of this project is to implement and study the KalmanNet architecture described in the research paper.
 
-The main objectives of this project are:
+The implementation focuses on:
 
-1. Understand the classical Kalman Filter.
-2. Implement the main KalmanNet architecture.
-3. Use a real UAV trajectory dataset.
-4. Train a neural network to estimate the Kalman gain.
-5. Compare KalmanNet with a classical Kalman Filter.
-6. Investigate the effect of model uncertainty on state estimation.
+* Generating linear Gaussian state-space trajectories
+* Implementing a classical Kalman Filter
+* Implementing a GRU-based KalmanNet
+* Training KalmanNet using state and observation sequences
+* Comparing KalmanNet with the classical Kalman Filter
+* Testing performance under model uncertainty
 
-## 🧠 KalmanNet Architecture
+## 📊 Dataset
 
-KalmanNet maintains the main prediction and state-update flow of a Kalman Filter.
+### Synthetic Linear Gaussian State-Space Dataset
 
-The Kalman prediction is performed using:
+This implementation uses **synthetically generated data based on a Linear Gaussian State-Space (SS) model**.
+
+The data is generated according to:
 
 ```text
-x̂(t|t-1) = F x̂(t-1)
+xₜ = F xₜ₋₁ + eₜ
 ```
 
-The predicted observation is:
-
 ```text
-ŷ(t|t-1) = H x̂(t|t-1)
-```
-
-The innovation is:
-
-```text
-Δy(t) = y(t) - ŷ(t|t-1)
-```
-
-Instead of calculating the Kalman gain analytically, KalmanNet uses a neural network:
-
-```text
-Previous State Estimate
-        +
-Current Observation
-        ↓
-Fully Connected Layer
-        ↓
-GRU
-        ↓
-Fully Connected Layer
-        ↓
-Learned Kalman Gain
-        ↓
-Kalman Update
-        ↓
-Updated State Estimate
-```
-
-The GRU provides temporal memory, allowing the network to learn information related to the unknown second-order statistics of the system.
-
-## 🚁 Dataset
-
-This project uses the **EuRoC MAV Dataset**, a real-world Micro Aerial Vehicle (MAV) dataset.
-
-The implementation uses the:
-
-```text
-MH_01_easy
-```
-
-sequence from the Machine Hall environment.
-
-The dataset provides UAV trajectory information that can be used as ground-truth information for evaluating state estimation.
-
-### State Representation
-
-The state used in this implementation is:
-
-```text
-[x, y, vx, vy]
+yₜ = H xₜ + vₜ
 ```
 
 where:
 
-* `x` = position along x-axis
-* `y` = position along y-axis
-* `vx` = velocity along x-axis
-* `vy` = velocity along y-axis
+* `xₜ` = hidden state at time `t`
+* `yₜ` = observation at time `t`
+* `F` = state transition matrix
+* `H` = observation matrix
+* `eₜ` = process noise
+* `vₜ` = observation noise
+* `Q` = process-noise covariance
+* `R` = observation-noise covariance
 
-The observation consists of noisy position measurements:
+The process and observation noises are sampled from Gaussian distributions.
 
-```text
-[x, y]
+This follows the state-space formulation used in the original KalmanNet paper. The paper assumes a linear Gaussian state-space model and generates training and testing trajectories from this model.
+
+### Training Data
+
+The notebook generates multiple trajectories for training.
+
+Example:
+
+```python
+T_train = 50
+N_train = 500
 ```
 
-This allows the Kalman Filter and KalmanNet to estimate the complete state from partial and noisy observations.
+where:
 
-## ⚙️ Technologies Used
+* `N_train` = number of training trajectories
+* `T_train` = number of time steps per trajectory
+
+Random initial states can be used during data generation.
+
+The resulting data consists of:
+
+```text
+Training observations → [N_train, T_train, observation_dimension]
+
+Training states → [N_train, T_train, state_dimension]
+```
+
+## 🧠 KalmanNet Architecture
+
+The main idea of KalmanNet is to retain the classical Kalman Filter flow while replacing the analytical Kalman Gain calculation with a neural network.
+
+The architecture is:
+
+```text
+Previous State Estimate
+          +
+Current Observation
+          ↓
+Fully Connected Layer
+          ↓
+GRU
+          ↓
+Fully Connected Layer
+          ↓
+Learned Kalman Gain
+          ↓
+Kalman Filter Update
+          ↓
+Updated State Estimate
+```
+
+The original paper uses a fully connected input layer, a GRU for temporal memory, and a fully connected output layer to produce the Kalman Gain.
+
+## 🔬 Methodology
+
+### 1. Generate State-Space Data
+
+Synthetic trajectories are generated from the Linear Gaussian State-Space model.
+
+Each trajectory contains:
+
+```text
+Observations: y₁, y₂, ..., yₜ
+States:       x₁, x₂, ..., xₜ
+```
+
+### 2. Classical Kalman Filter
+
+The classical Kalman Filter performs:
+
+```text
+Prediction
+     ↓
+Observation Prediction
+     ↓
+Innovation
+     ↓
+Kalman Gain
+     ↓
+State Update
+```
+
+The analytical Kalman Gain is calculated using the predicted covariance and observation model.
+
+### 3. KalmanNet
+
+KalmanNet follows the same filtering structure.
+
+However, instead of calculating the Kalman Gain directly from the covariance matrices, a neural network estimates it.
+
+The network receives information from the previous state estimate and current observation and uses the GRU's hidden state to maintain temporal information.
+
+### 4. Training
+
+KalmanNet is trained using supervised learning.
+
+The true state generated by the state-space model is used as the target.
+
+The loss is Mean Squared Error:
+
+```text
+MSE = mean((x_true - x_estimated)²)
+```
+
+The Adam optimizer is used for training.
+
+This follows the paper's sequence-to-sequence supervised training approach.
+
+### 5. Evaluation
+
+The trained KalmanNet is compared with the classical Kalman Filter using state-estimation error.
+
+The implementation also investigates the effect of inaccurate model parameters.
+
+## 📈 Experiments
+
+Two main cases are considered.
+
+### Case 1 — Accurate Model Knowledge
+
+The Kalman Filter and KalmanNet are provided with the correct state-transition and observation models.
+
+The goal is to determine whether KalmanNet can approach the performance of the classical Kalman Filter.
+
+### Case 2 — Inaccurate Model Knowledge
+
+The filtering algorithms are given inaccurate model parameters.
+
+The goal is to investigate whether KalmanNet can learn to compensate for model mismatch.
+
+The original paper reports that KalmanNet can be more robust than the classical Kalman Filter when the assumed state-space model is inaccurate.
+
+## 🛠️ Technologies Used
 
 * Python
 * PyTorch
 * NumPy
-* Pandas
 * Matplotlib
-* SciPy
 * Jupyter Notebook
 * Kaggle Notebook
-* EuRoC MAV Dataset
 
 ## 📂 Project Structure
 
 ```text
 KalmanNet-Data-Driven-Filtering/
 │
-├── KalmanNet_EuRoC_MH01_Kaggle.ipynb
+├── KalmanNet.ipynb
 ├── README.md
 ├── requirements.txt
-├── .gitignore
-│
-└── results/
-    ├── training_loss.png
-    ├── trajectory_comparison.png
-    └── error_comparison.png
+└── .gitignore
 ```
-
-## 🔬 Methodology
-
-The implementation consists of the following stages.
-
-### 1. Load UAV Dataset
-
-The EuRoC MAV trajectory data is loaded and processed to obtain position and velocity information.
-
-### 2. Construct State and Observation
-
-The state vector is constructed as:
-
-```text
-x = [x, y, vx, vy]
-```
-
-while the observation contains:
-
-```text
-y = [x, y]
-```
-
-Noise is introduced into the observations to simulate the noisy measurements encountered in practical state-estimation problems.
-
-### 3. Classical Kalman Filter
-
-A classical Kalman Filter is implemented using the state transition matrix `F` and observation matrix `H`.
-
-The standard Kalman filtering process consists of:
-
-```text
-Prediction
-    ↓
-Innovation Calculation
-    ↓
-Kalman Gain
-    ↓
-State Update
-```
-
-### 4. KalmanNet
-
-KalmanNet follows the same model-based prediction and update structure.
-
-The main difference is that the Kalman gain is learned using a neural network consisting of:
-
-```text
-Fully Connected Layer → GRU → Fully Connected Layer
-```
-
-The network is trained using the true state as the target.
-
-### 5. Training
-
-The network is trained using Mean Squared Error (MSE):
-
-```text
-MSE = mean((x_true - x_estimated)²)
-```
-
-The Adam optimizer is used for neural-network training.
-
-### 6. Evaluation
-
-The trained KalmanNet is evaluated against the classical Kalman Filter.
-
-The comparison includes:
-
-* State estimation error
-* Position estimation
-* Trajectory reconstruction
-* MSE
-* Performance under model uncertainty
-
-## 📊 Expected Results
-
-The main purpose of the experiment is to investigate whether the data-driven Kalman gain can provide improved state estimation when the assumed system model is inaccurate.
-
-The original KalmanNet paper reports that KalmanNet can achieve performance close to the optimal Kalman Filter when the model is accurate and can provide improved robustness compared with the classical Kalman Filter when the model parameters are inaccurate.
-
-This project applies that idea to a real UAV trajectory.
-
-## 📈 Visualizations
-
-The notebook generates visualizations such as:
-
-### UAV Trajectory
-
-Comparison between:
-
-* Ground-truth trajectory
-* Kalman Filter estimate
-* KalmanNet estimate
-
-### Training Loss
-
-The training and validation loss of the KalmanNet neural network.
-
-### Estimation Error
-
-Comparison of the estimation errors produced by:
-
-```text
-Classical Kalman Filter
-vs.
-KalmanNet
-```
-
-### Model Mismatch
-
-The implementation can also evaluate the filters using inaccurate system parameters to investigate robustness.
 
 ## 🚀 How to Run
 
-### Option 1 — Kaggle
+### Kaggle
 
 1. Open Kaggle.
 2. Create a new notebook.
-3. Upload:
+3. Upload `KalmanNet.ipynb`.
+4. Run the notebook cells sequentially.
 
-```text
-KalmanNet_EuRoC_MH01_Kaggle.ipynb
-```
+No external UAV dataset is required because the current implementation generates the Linear Gaussian State-Space data directly in Python.
 
-4. Enable Internet access if the notebook downloads the dataset.
-5. Run all cells.
-
-### Option 2 — Local Jupyter Notebook
+### Local Environment
 
 Clone the repository:
 
@@ -289,13 +231,13 @@ Clone the repository:
 git clone https://github.com/YOUR_USERNAME/KalmanNet-Data-Driven-Filtering.git
 ```
 
-Move into the project directory:
+Enter the project directory:
 
 ```bash
 cd KalmanNet-Data-Driven-Filtering
 ```
 
-Install dependencies:
+Install the required packages:
 
 ```bash
 pip install -r requirements.txt
@@ -310,73 +252,66 @@ jupyter notebook
 Open:
 
 ```text
-KalmanNet_EuRoC_MH01_Kaggle.ipynb
+KalmanNet.ipynb
 ```
-
-and run the cells sequentially.
 
 ## 📦 Requirements
 
-The main Python libraries required are:
-
 ```text
 numpy
-pandas
 matplotlib
-scipy
 torch
 jupyter
 ```
 
-Install them using:
+Install using:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 🔎 Difference Between KF and KalmanNet
+## 🔄 Kalman Filter vs KalmanNet
 
-| Feature                   | Kalman Filter | KalmanNet          |
-| ------------------------- | ------------- | ------------------ |
-| Model-based               | Yes           | Yes                |
-| Data-driven               | No            | Yes                |
-| Kalman gain               | Analytical    | Learned            |
-| GRU                       | No            | Yes                |
-| Requires noise statistics | Yes           | Reduced dependency |
-| Handles model uncertainty | Limited       | More robust        |
-| State estimation          | Yes           | Yes                |
+| Feature                            | Kalman Filter | KalmanNet           |
+| ---------------------------------- | ------------- | ------------------- |
+| Model-based                        | Yes           | Yes                 |
+| Data-driven                        | No            | Yes                 |
+| Kalman Gain                        | Analytical    | Neural Network      |
+| GRU                                | No            | Yes                 |
+| Requires explicit noise statistics | Yes           | Reduced             |
+| Training required                  | No            | Yes                 |
+| Handles model uncertainty          | Limited       | Improved robustness |
 
-## 💡 Key Learning
+## 💡 Key Idea
 
-The main concept demonstrated by this project is that deep learning does not necessarily have to replace a traditional algorithm completely.
+The main concept behind this project is **hybrid model-based deep learning**.
 
-KalmanNet combines the strengths of both approaches:
+Instead of replacing the Kalman Filter completely with a neural network, KalmanNet keeps the known structure of the Kalman Filter and uses deep learning only where it is most useful.
 
 ```text
-Domain Knowledge
+Classical Model
       +
-Deep Learning
+Neural Network
       ↓
-Hybrid State Estimator
+    KalmanNet
 ```
 
-The known system dynamics are retained, while the neural network learns the part of the filtering process that depends on unknown or inaccurate statistical information.
+The paper identifies the Kalman Gain as the key component affected by the unknown noise statistics and therefore replaces its computation with a learned neural network.
 
 ## 🔮 Future Improvements
 
-Possible extensions include:
+The current implementation can be extended by:
 
-* Using additional EuRoC sequences.
-* Using the full 3D UAV state.
-* Incorporating IMU measurements.
-* Using orientation information.
+* Testing on real UAV datasets such as EuRoC MAV.
 * Testing on the UZH-FPV dataset.
-* Extending the model to nonlinear dynamics.
-* Comparing with Extended Kalman Filter (EKF).
-* Comparing with Unscented Kalman Filter (UKF).
+* Using real IMU measurements.
+* Extending the state representation.
+* Testing nonlinear state-space models.
+* Comparing against Extended Kalman Filter (EKF).
+* Comparing against Unscented Kalman Filter (UKF).
+* Testing different levels of process and observation noise.
 * Hyperparameter tuning of the GRU.
-* Testing under different levels of measurement noise.
-* Evaluating additional metrics such as RMSE and MAE.
+* Testing additional trajectory lengths.
 
 ## 📚 Reference
 
@@ -386,20 +321,14 @@ Revach, G., Shlezinger, N., van Sloun, R. J. G., & Eldar, Y. C.
 
 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP), 2021.
 
-The paper introduces KalmanNet as a hybrid data-driven/model-based implementation of Kalman filtering in which a dedicated neural network learns the Kalman gain.
+The paper proposes KalmanNet as a data-driven implementation of Kalman filtering that learns the Kalman Gain while retaining the classical Kalman Filter structure.
 
 ## ⚠️ Disclaimer
 
-This repository is intended for **academic and educational purposes**. It is an implementation and adaptation of the KalmanNet research concept for experimentation with UAV state estimation.
-
-It should not be considered a production-grade navigation or flight-control system.
+This project is intended for **academic and educational purposes**. It is an implementation and study of the KalmanNet research concept and is not intended for production-grade navigation or autonomous flight systems.
 
 ## 👤 Author
 
 **Sagnik Das**
 
 B.Tech — Computer Science and Engineering
-
----
-
-⭐ If you find this project useful, consider starring the repository.
